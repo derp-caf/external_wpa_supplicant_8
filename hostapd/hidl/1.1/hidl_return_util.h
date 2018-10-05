@@ -16,7 +16,7 @@ namespace android {
 namespace hardware {
 namespace wifi {
 namespace hostapd {
-namespace V1_0 {
+namespace V1_1 {
 namespace implementation {
 namespace hidl_return_util {
 
@@ -28,7 +28,7 @@ namespace hidl_return_util {
 template <typename ObjT, typename WorkFuncT, typename... Args>
 Return<void> call(
     ObjT* obj, WorkFuncT&& work,
-    const std::function<void(const HostapdStatus&)>& hidl_cb, Args&&... args)
+    const std::function<void(const V1_0::HostapdStatus&)>& hidl_cb, Args&&... args)
 {
 	hidl_cb((obj->*work)(std::forward<Args>(args)...));
 	return Void();
@@ -36,7 +36,7 @@ Return<void> call(
 
 }  // namespace hidl_return_util
 }  // namespace implementation
-}  // namespace V1_0
+}  // namespace V1_1
 }  // namespace hostapd
 }  // namespace wifi
 }  // namespace hardware
