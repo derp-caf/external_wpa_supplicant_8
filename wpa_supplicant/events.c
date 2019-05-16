@@ -2441,6 +2441,42 @@ static int wpa_supplicant_event_associnfo(struct wpa_supplicant *wpa_s,
 		}
 	}
 
+	wpa_s->connection_vht_max_eight_spatial_streams = 0;
+	wpa_s->connection_twt = 0;
+	if (wpa_s->connection_set && wpa_s->connection_vht) {
+		const u8 *ie;
+		int twt_req_support, twt_resp_support;
+
+		ie = get_ie(data->assoc_info.resp_ies,
+			    data->assoc_info.resp_ies_len,
+			    WLAN_EID_VHT_CAP);
+
+		if (ie && ie[1] >= 4) {
+			struct ieee80211_vht_capabilities *vht_capa;
+
+			vht_capa = (struct ieee80211_vht_capabilities *) &ie[2];
+
+			if ((le_to_host32(vht_capa->vht_capabilities_info) &
+			    VHT_CAP_BEAMFORMEE_STS_MAX) == VHT_CAP_BEAMFORMEE_STS_MAX)
+				wpa_s->connection_vht_max_eight_spatial_streams = 1;
+		}
+
+		ie = get_ie(data->assoc_info.req_ies,
+			    data->assoc_info.req_ies_len,
+			    WLAN_EID_EXT_CAPAB);
+
+		twt_req_support = ieee802_11_ext_capab(ie, 77);
+
+		ie = get_ie(data->assoc_info.resp_ies,
+			    data->assoc_info.resp_ies_len,
+			    WLAN_EID_EXT_CAPAB);
+
+		twt_resp_support = ieee802_11_ext_capab(ie, 78);
+
+		if (twt_req_support && twt_resp_support)
+			wpa_s->connection_twt = 1;
+	}
+
 	p = data->assoc_info.req_ies;
 	l = data->assoc_info.req_ies_len;
 
@@ -2859,8 +2895,17 @@ static void wpa_supplicant_event_assoc(struct wpa_supplicant *wpa_s,
 	}
 	wpa_supplicant_cancel_scan(wpa_s);
 
-	if ((wpa_s->drv_flags & WPA_DRIVER_FLAGS_4WAY_HANDSHAKE_PSK) &&
-	    wpa_key_mgmt_wpa_psk(wpa_s->key_mgmt)) {
+	if (ft_completed) {
+		/*
+		 * FT protocol completed - make sure EAPOL state machine ends
+		 * up in authenticated.
+		 */
+		wpa_supplicant_cancel_auth_timeout(wpa_s);
+		wpa_supplicant_set_state(wpa_s, WPA_COMPLETED);
+		eapol_sm_notify_portValid(wpa_s->eapol, TRUE);
+		eapol_sm_notify_eap_success(wpa_s->eapol, TRUE);
+	} else if ((wpa_s->drv_flags & WPA_DRIVER_FLAGS_4WAY_HANDSHAKE_PSK) &&
+		   wpa_key_mgmt_wpa_psk(wpa_s->key_mgmt)) {
 		/*
 		 * We are done; the driver will take care of RSN 4-way
 		 * handshake.
@@ -2877,15 +2922,6 @@ static void wpa_supplicant_event_assoc(struct wpa_supplicant *wpa_s,
 		 * waiting for WPA supplicant.
 		 */
 		eapol_sm_notify_portValid(wpa_s->eapol, TRUE);
-	} else if (ft_completed) {
-		/*
-		 * FT protocol completed - make sure EAPOL state machine ends
-		 * up in authenticated.
-		 */
-		wpa_supplicant_cancel_auth_timeout(wpa_s);
-		wpa_supplicant_set_state(wpa_s, WPA_COMPLETED);
-		eapol_sm_notify_portValid(wpa_s->eapol, TRUE);
-		eapol_sm_notify_eap_success(wpa_s->eapol, TRUE);
 	}
 
 	wpa_s->last_eapol_matches_bssid = 0;
