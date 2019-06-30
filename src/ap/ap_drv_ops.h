@@ -125,6 +125,8 @@ int hostapd_start_dfs_cac(struct hostapd_iface *iface,
 			  int sec_channel_offset, int vht_oper_chwidth,
 			  int center_segment0, int center_segment1);
 int hostapd_drv_do_acs(struct hostapd_data *hapd);
+int hostapd_drv_update_dh_ie(struct hostapd_data *hapd, const u8 *peer,
+			     u16 reason_code, const u8 *ie, size_t ielen);
 
 
 #include "drivers/driver.h"
@@ -337,6 +339,16 @@ static inline int hostapd_drv_br_set_net_param(struct hostapd_data *hapd,
 		return -1;
 	return hapd->driver->br_set_net_param(hapd->drv_priv, param, val);
 }
+
+#ifdef ANDROID
+static inline int hostapd_drv_driver_cmd(struct hostapd_data *hapd,
+				     char *cmd, char *buf, size_t buf_len)
+{
+	if (!hapd->driver->driver_cmd)
+		return -1;
+	return hapd->driver->driver_cmd(hapd->drv_priv, cmd, buf, buf_len);
+}
+#endif /* ANDROID */
 
 static inline int hostapd_drv_vendor_cmd(struct hostapd_data *hapd,
 					 int vendor_id, int subcmd,
