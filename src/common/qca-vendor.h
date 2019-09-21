@@ -571,6 +571,18 @@ enum qca_radiotap_vendor_ids {
  *
  *	All the attributes used with this command are defined in
  *	enum qca_wlan_vendor_attr_beacon_reporting_params.
+ * @QCA_NL80211_VENDOR_SUBCMD_INTEROP_ISSUES_AP: In practice, some APs have
+ *	interop issues with the DUT. This sub command is used to transfer the
+ *	AP info between the driver and user space. This works both as a command
+ *	and an event. As a command, it configures the stored list of APs from
+ *	user space to firmware; as an event, it indicates the AP info detected
+ *	by the firmware to user space for persistent storage. The attributes
+ *	defined in enum qca_vendor_attr_interop_issues_ap are used to deliver
+ *	the parameters.
+ * @QCA_NL80211_VENDOR_SUBCMD_OEM_DATA: This command is used to send OEM data
+ *	binary blobs from application/service to firmware. The attributes
+ *	defined in enum qca_wlan_vendor_attr_oem_data_params are used to deliver
+ *	the parameters.
  */
 enum qca_nl80211_vendor_subcmds {
 	QCA_NL80211_VENDOR_SUBCMD_UNSPEC = 0,
@@ -740,6 +752,8 @@ enum qca_nl80211_vendor_subcmds {
 	QCA_NL80211_VENDOR_SUBCMD_PEER_STATS_CACHE_FLUSH = 178,
 	QCA_NL80211_VENDOR_SUBCMD_MPTA_HELPER_CONFIG = 179,
 	QCA_NL80211_VENDOR_SUBCMD_BEACON_REPORTING = 180,
+	QCA_NL80211_VENDOR_SUBCMD_INTEROP_ISSUES_AP = 181,
+	QCA_NL80211_VENDOR_SUBCMD_OEM_DATA = 182,
 };
 
 enum qca_wlan_vendor_attr {
@@ -1835,6 +1849,30 @@ enum qca_wlan_vendor_attr_config {
 	 * 1-Enable, 0-Disable
 	 */
 	QCA_WLAN_VENDOR_ATTR_CONFIG_GTX = 57,
+
+	/* Attribute to configure disconnect IEs to the driver.
+	 * This carries an array of unsigned 8-bit characters.
+	 *
+	 * If this is configured, driver shall fill the IEs in disassoc/deauth
+	 * frame.
+	 * These IEs are expected to be considered only for the next
+	 * immediate disconnection (disassoc/deauth frame) originated by
+	 * the DUT, irrespective of the entity (user space/driver/firmware)
+	 * triggering the disconnection.
+	 * The host drivers are not expected to use the IEs set through
+	 * this interface for further disconnections after the first immediate
+	 * disconnection initiated post the configuration.
+	 * If the IEs are also updated through cfg80211 interface (after the
+	 * enhancement to cfg80211_disconnect), host driver is expected to
+	 * take the union of IEs from both of these interfaces and send in
+	 * further disassoc/deauth frames.
+	 */
+	QCA_WLAN_VENDOR_ATTR_DISCONNECT_IES = 58,
+
+	/* 8-bit unsigned value for ELNA bypass.
+	 * 1-Enable, 0-Disable
+	 */
+	QCA_WLAN_VENDOR_ATTR_CONFIG_ELNA_BYPASS = 59,
 
 	/* keep last */
 	QCA_WLAN_VENDOR_ATTR_CONFIG_AFTER_LAST,
@@ -7327,4 +7365,63 @@ enum qca_wlan_vendor_attr_beacon_reporting_params {
 		QCA_WLAN_VENDOR_ATTR_BEACON_REPORTING_LAST - 1
 };
 
+/**
+ * enum qca_vendor_interop_issues_ap_type - Interop issue types
+ * This enum defines the valid set of values of interop issue types. These
+ * values are used by attribute %QCA_WLAN_VENDOR_ATTR_INTEROP_ISSUES_AP_TYPE.
+ *
+ * @QCA_VENDOR_INTEROP_ISSUES_AP_ON_STA_PS: The AP has power save interop issue
+ * when the STA's Qpower feature is enabled.
+ */
+enum qca_vendor_interop_issues_ap_type {
+	QCA_VENDOR_INTEROP_ISSUES_AP_INVALID = 0,
+	QCA_VENDOR_INTEROP_ISSUES_AP_ON_STA_PS = 1,
+};
+
+/**
+ * enum qca_vendor_attr_interop_issues_ap - attribute for AP with interop issues
+ * Values are used by %QCA_NL80211_VENDOR_SUBCMD_INTEROP_ISSUES_AP.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_INTEROP_ISSUES_AP_INVALID: Invalid value
+ * @QCA_WLAN_VENDOR_ATTR_INTEROP_ISSUES_AP_TYPE: Interop issue type
+ * 32-bit unsigned value. The values defined in enum
+ * qca_vendor_interop_issues_ap_type are used.
+ * @QCA_WLAN_VENDOR_ATTR_INTEROP_ISSUES_AP_LIST: APs' BSSID container
+ * array of nested QCA_WLAN_VENDOR_ATTR_INTEROP_ISSUES_AP_BSSID attributes.
+ * It is present and mandatory for the command but is not used for the event
+ * since only a single BSSID is reported in an event.
+ * @QCA_WLAN_VENDOR_ATTR_INTEROP_ISSUES_AP_BSSID: AP's BSSID 6-byte MAC address.
+ * It is used within the nested QCA_WLAN_VENDOR_ATTR_INTEROP_ISSUES_AP_LIST
+ * attribute in command case and without such encapsulation in the event case.
+ * @QCA_WLAN_VENDOR_ATTR_INTEROP_ISSUES_AP_AFTER_LAST: last value
+ * @QCA_WLAN_VENDOR_ATTR_INTEROP_ISSUES_AP_MAX: max value
+ */
+enum qca_vendor_attr_interop_issues_ap {
+	QCA_WLAN_VENDOR_ATTR_INTEROP_ISSUES_AP_INVALID,
+	QCA_WLAN_VENDOR_ATTR_INTEROP_ISSUES_AP_TYPE,
+	QCA_WLAN_VENDOR_ATTR_INTEROP_ISSUES_AP_LIST,
+	QCA_WLAN_VENDOR_ATTR_INTEROP_ISSUES_AP_BSSID,
+	/* keep last */
+	QCA_WLAN_VENDOR_ATTR_INTEROP_ISSUES_AP_AFTER_LAST,
+	QCA_WLAN_VENDOR_ATTR_INTEROP_ISSUES_AP_MAX =
+		QCA_WLAN_VENDOR_ATTR_INTEROP_ISSUES_AP_AFTER_LAST - 1
+};
+
+/*
+ * enum qca_wlan_vendor_attr_oem_data_params - Used by the vendor command
+ * QCA_NL80211_VENDOR_SUBCMD_OEM_DATA.
+ *
+ * @QCA_WLAN_VENDOR_ATTR_OEM_DATA_CMD_DATA: The binary blob for the vendor
+ * command QCA_NL80211_VENDOR_SUBCMD_OEM_DATA are carried through this attribute.
+ * NLA_BINARY attribute, the max size is 1024 bytes.
+ */
+enum qca_wlan_vendor_attr_oem_data_params {
+	QCA_WLAN_VENDOR_ATTR_OEM_DATA_INVALID = 0,
+	QCA_WLAN_VENDOR_ATTR_OEM_DATA_CMD_DATA = 1,
+
+	/* keep last */
+	QCA_WLAN_VENDOR_ATTR_OEM_DATA_PARAMS_AFTER_LAST,
+	QCA_WLAN_VENDOR_ATTR_OEM_DATA_PARAMS_MAX =
+		QCA_WLAN_VENDOR_ATTR_OEM_DATA_PARAMS_AFTER_LAST - 1
+};
 #endif /* QCA_VENDOR_H */
